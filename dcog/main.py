@@ -3,7 +3,7 @@ from data import DataPrepper
 
 
 # Load the data and export it to a means suited for DL.
-eggnog_proteins_fp = "/home/keo7/Data/dcog/e5.proteomes_smol.faa"
+eggnog_proteins_dir = "/home/keo7/Data/dcog/sequences"
 nog_annotations_fp = "/home/keo7/Data/dcog/e5.og_annotations.tsv"
 sequence_aliases_fp = "/home/keo7/Data/dcog/e5.sequence_aliases_v_smol.tsv"
 
@@ -14,5 +14,6 @@ ambig_dict = {
             "J" : ["I", "L"]
         }
 
-dp = DataPrepper(eggnog_proteins_fp, nog_annotations_fp, sequence_aliases_fp, 3, ambig_dict=ambig_dict)
+dp = DataPrepper(eggnog_proteins_dir, nog_annotations_fp, sequence_aliases_fp, 3, ambig_dict=ambig_dict)
 
+dp.process()

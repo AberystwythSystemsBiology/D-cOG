@@ -6,20 +6,18 @@ import textwrap
 
 class DataPrepper:
     def __init__(self,
-                eggnog_proteins_fp:str,
+                eggnog_proteins_dir:str,
                 nog_annotations_fp:str,
                 sequence_aliases_fp:str,
                 ngrams:int=1,
-                vocab:str="ACDEFGHIKLMNPQRSTVWY",
+                vocab:str="ACDEFGHIKLMNPQRSTVWYUOx",
                 ambig_dict:dict = {}
                 ):
 
         self.vocab = [x for x in vocab]
         self.ambig_dict = self._generate_ambig_probabilities(ambig_dict)
 
-        '''
-
-        self.eggnog_proteins_fp = eggnog_proteins_fp
+        self.eggnog_proteins_dir = eggnog_proteins_dir
 
         self.nog_annotations_fp = nog_annotations_fp
         self.sequence_aliases_fp = sequence_aliases_fp
@@ -30,7 +28,6 @@ class DataPrepper:
 
         self.ngram_dict = self._generate_ngram_dict()
         self.alias_dict = self._generate_aliases_dict()
-        '''
 
         self.is_processed = False
 
@@ -95,13 +92,15 @@ class DataPrepper:
 
         d = {}
 
+        vocab = self.vocab + list(self.ambig_dict.keys())
+
         for i in range(self.ngrams+1):
             if len(d.values()) == 0:
                 _mv = 0
             else:
                 _mv = max(d.values())
 
-            _i_d = {"".join(x) : i+_mv for i, x in enumerate(itertools.product(self.vocab, repeat=i))}
+            _i_d = {"".join(x) : i+_mv for i, x in enumerate(itertools.product(vocab, repeat=i))}
 
             d.update(_i_d)
         return d
@@ -110,7 +109,6 @@ class DataPrepper:
     def process(self) -> None:
 
         def _ngram(seq: str) -> list:
-            print(textwrap.wrap(str(seq), 2))
             return [self.ngram_dict[x] for x in textwrap.wrap(str(seq), self.ngrams)]
 
         logging.info(">>> Processing data.")
