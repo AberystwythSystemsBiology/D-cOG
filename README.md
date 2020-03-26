@@ -1,6 +1,6 @@
 # D-cOG
-Deep Annotation of Protein Sequences
 
+> This project is currently under development.
 
 ## Authors
 
