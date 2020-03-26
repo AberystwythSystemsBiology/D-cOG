@@ -3,16 +3,20 @@ import csv
 from Bio import SeqIO
 import logging
 import textwrap
+import os
+from joblib import Parallel, delayed
+
 
 class DataPrepper:
-    def __init__(self,
-                eggnog_proteins_dir:str,
-                nog_annotations_fp:str,
-                sequence_aliases_fp:str,
-                ngrams:int=1,
-                vocab:str="ACDEFGHIKLMNPQRSTVWYUOx",
-                ambig_dict:dict = {}
-                ):
+    def __init__(
+        self,
+        eggnog_proteins_dir: str,
+        nog_annotations_fp: str,
+        sequence_aliases_fp: str,
+        ngrams: int = 1,
+        vocab: str = "ACDEFGHIKLMNPQRSTVWYUOx",
+        ambig_dict: dict = {},
+    ):
 
         self.vocab = [x for x in vocab]
         self.ambig_dict = self._generate_ambig_probabilities(ambig_dict)
@@ -32,9 +36,8 @@ class DataPrepper:
         self.is_processed = False
 
     def _generate_ambig_probabilities(self, ambig_dict: dict) -> dict:
-
         def __generate_probabilities_table() -> dict:
-            return {aa : 0  for aa in self.vocab}
+            return {aa: 0 for aa in self.vocab}
 
         probabilities_dict = {}
 
@@ -47,7 +50,7 @@ class DataPrepper:
         for aa in ambig_dict:
             _p = __generate_probabilities_table()
 
-            calc_prob = (1 / len(ambig_dict[aa]))
+            calc_prob = 1 / len(ambig_dict[aa])
 
             for prob in ambig_dict[aa]:
                 _p[prob] = calc_prob
@@ -83,10 +86,6 @@ class DataPrepper:
         logging.info(">>> ✅ Annotation file loaded.")
         return nog_annots
 
-    @property
-    def proteome(self) -> list:
-        return SeqIO.parse(self.eggnog_proteins_fp, "fasta")
-
     def _generate_ngram_dict(self) -> dict:
         logging.info(">>> Loading in annotation file.")
 
@@ -94,27 +93,41 @@ class DataPrepper:
 
         vocab = self.vocab + list(self.ambig_dict.keys())
 
-        for i in range(self.ngrams+1):
+        for i in range(self.ngrams + 1):
             if len(d.values()) == 0:
                 _mv = 0
             else:
                 _mv = max(d.values())
 
-            _i_d = {"".join(x) : i+_mv for i, x in enumerate(itertools.product(vocab, repeat=i))}
+            _i_d = {
+                "".join(x): i + _mv
+                for i, x in enumerate(itertools.product(vocab, repeat=i))
+            }
 
             d.update(_i_d)
         return d
 
+    def load_fasta(self, fp) -> list:
+        return SeqIO.parse(fp, "fasta")
 
     def process(self) -> None:
+        def _process_data(fp: str) -> list:
 
-        def _ngram(seq: str) -> list:
-            return [self.ngram_dict[x] for x in textwrap.wrap(str(seq), self.ngrams)]
+            for seq in SeqIO.parse(fp, "fasta"):
+                ngrams = [
+                    self.ngram_dict[x] for x in textwrap.wrap(str(seq.seq), self.ngrams)
+                ]
+                print(ngrams)
+            return [0]
 
         logging.info(">>> Processing data.")
 
-        for seq in self.proteome:
-            ng_seq = _ngram(seq.seq)
+        fps = [
+            os.path.join(self.eggnog_proteins_dir, x)
+            for x in os.listdir(self.eggnog_proteins_dir)
+        ]
+
+        data = Parallel(n_jobs=16)(delayed(_process_data)(fp) for fp in fps)
 
         self.is_processed = True
 
@@ -123,4 +136,3 @@ class DataPrepper:
             pass
         else:
             print("Please apply run process on this class before exporting")
-
