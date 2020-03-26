@@ -126,11 +126,11 @@ class DataPrepper:
     def load_fasta(self, fp) -> list:
         return SeqIO.parse(fp, "fasta")
 
-    def _process_data(self, fp: str) -> None:
+    def _process_data(self, input: list) -> None:
 
-        fp, out_dir = fp
+        fp, out_dir = input
 
-        output = {}
+
 
         for index, seq in enumerate(SeqIO.parse(fp, "fasta")):
             id = seq.id
@@ -148,24 +148,14 @@ class DataPrepper:
                     self.ngram_dict[x] for x in textwrap.wrap(sequence_str, self.ngrams)
                 ]
 
-                p_table = [self.ambig_dict[x] for x in sequence_str]
-
-                output[id] = {
+                #p_table = [self.ambig_dict[x] for x in sequence_str]
+                output = {
                     "COG": annotations,
                     "ngrammed_sequence": ngrams,
-                    # "probability_table": p_table,
                 }
 
-        bfn = os.path.basename(fp)
-        woe = os.path.splitext(bfn)[0] + ".json"
-
-        sequences_out_dir = os.path.join(out_dir, "sequences")
-
-        if not os.path.isdir(sequences_out_dir):
-            os.mkdir(sequences_out_dir)
-
-        with open(os.path.join(sequences_out_dir, woe), "w") as outfile:
-            json.dump(output, outfile, indent=4)
+                with open(os.path.join(out_dir, "%s.json" % (id)), "w") as outfile:
+                    json.dump(output, outfile, indent=4)
 
         return None
 
@@ -173,10 +163,17 @@ class DataPrepper:
 
         logging.info(">>> Processing data.")
 
+        sequences_out_dir = os.path.join(out_dir, "sequences")
+
+        if not os.path.isdir(sequences_out_dir):
+            os.mkdir(sequences_out_dir)
+
         fps = [
-            [os.path.join(self.eggnog_proteins_dir, x), out_dir]
+            [os.path.join(self.eggnog_proteins_dir, x), sequences_out_dir]
             for x in os.listdir(self.eggnog_proteins_dir)
         ]
+
+
 
         #p = Pool(None)
         #p.map(self._process_data, fps[0])
