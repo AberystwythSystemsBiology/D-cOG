@@ -1,4 +1,4 @@
-import os
+import os, json
 from data import DataPrepper, DataGenerator
 import logging
 
@@ -48,10 +48,29 @@ encoded_labels = {a: i for i, a in enumerate(nogs.keys())}
 
 out_dir = "/home/keo7/Data/dcog/test_output/"
 sequences_dir = os.path.join(out_dir, "sequences")
+ngram_dict_fp = os.path.join(out_dir, "ngram_dict.json")
+
+with open(ngram_dict_fp, "r") as infile:
+    ngrams = json.load(infile)
+
+max_features = max(ngrams.items())[1] + 1
 
 filepaths = [os.path.join(sequences_dir, x) for x in os.listdir(sequences_dir)]
 
 dg = DataGenerator(filepaths, encoded_labels, 100)
 
-for X, y in dg:
-    print(X, y)
+from keras.models import Sequential
+from keras.layers import Dense, Embedding
+from keras.layers import LSTM
+
+model = Sequential()
+model.add(Embedding(max_features, 128))
+model.add(LSTM(128, dropout=0.2, recurrent_dropout=0.2))
+model.add(Dense(len(nogs.keys()), activation='softmax'))
+
+# try using different optimizers and different optimizer configs
+model.compile(loss='sparse_categorical_crossentropy',
+              optimizer='adam',
+              metrics=['accuracy'])
+
+model.fit_generator(dg)

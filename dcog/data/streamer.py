@@ -37,11 +37,7 @@ class DataGenerator(Sequence):
     def _process_data(self, filepath):
         with open(filepath, "r") as infile:
             data = json.load(infile)
-            try:
-                seq = pad_sequences(data["ngrammed_sequence"], self.max_length)
-            except Exception:
-                print(data)
-                exit(0)
+            seq = np.array(data["ngrammed_sequence"])
             con = self.encoded_labels[data["COG"][0]]
 
         return seq, con
@@ -49,5 +45,8 @@ class DataGenerator(Sequence):
     def __data_generation(self, file_paths_temp):
         p = Pool(None)
         d = p.map(self._process_data, file_paths_temp)
-        print(d)
-        return [x[0] for x in d], [x[1] for x in d]
+        X, y = [x[0] for x in d], [x[1] for x in d]
+
+        X = pad_sequences(np.array(X), self.max_length)
+
+        return X, np.array(y)
