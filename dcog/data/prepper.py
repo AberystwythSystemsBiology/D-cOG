@@ -4,34 +4,35 @@ from Bio import SeqIO
 import logging
 import textwrap
 import os
-from joblib import Parallel, delayed
+import sys
+import json
+
+csv.field_size_limit(sys.maxsize)
+
+from multiprocessing import Pool
 
 
 class DataPrepper:
     def __init__(
         self,
         eggnog_proteins_dir: str,
-        nog_annotations_fp: str,
-        sequence_aliases_fp: str,
+        protein_id_conversion: str,
         ngrams: int = 1,
         vocab: str = "ACDEFGHIKLMNPQRSTVWYUOx",
         ambig_dict: dict = {},
     ):
 
-        self.vocab = [x for x in vocab]
-        self.ambig_dict = self._generate_ambig_probabilities(ambig_dict)
-
         self.eggnog_proteins_dir = eggnog_proteins_dir
-
-        self.nog_annotations_fp = nog_annotations_fp
-        self.sequence_aliases_fp = sequence_aliases_fp
+        self.protein_id_conversion = protein_id_conversion
 
         self.ngrams = ngrams
 
-        self.nog_annots = self._load_annots()
+        self.vocab = [x for x in vocab]
+        self.ambig_dict = self._generate_ambig_probabilities(ambig_dict)
 
         self.ngram_dict = self._generate_ngram_dict()
-        self.alias_dict = self._generate_aliases_dict()
+
+        self.nog_annots = self._load_annots()
 
         self.is_processed = False
 
@@ -59,14 +60,15 @@ class DataPrepper:
 
         return probabilities_dict
 
-    def _generate_aliases_dict(self) -> dict:
+    def _generate_labels(self) -> dict:
         logging.info(">>> Loading in aliases file.")
 
         alias_dict = {}
         with open(self.sequence_aliases_fp, "r") as infile:
             csv_reader = csv.reader(infile, delimiter="\t")
             for row in csv_reader:
-                alias_dict[row[0]] = row[1]
+                if row[2] == "Ensembl_UniProt":
+                    alias_dict[row[0]] = row[1]
 
         logging.info(">>> ✅ Aliases file loaded.")
 
@@ -76,18 +78,29 @@ class DataPrepper:
         logging.info(">>> Loading in annotation file.")
 
         nog_annots = {}
-        with open(self.nog_annotations_fp, "r") as infile:
+        with open(self.protein_id_conversion, "r") as infile:
             csv_reader = csv.reader(infile, delimiter="\t")
 
             for row in csv_reader:
-                _, anot, nog_anot, _ = row
-                nog_annots[anot] = nog_anot
+                _anot = []
+
+                # MIGHT NEED TO CHECK FOR U ON ITS OWN
+                for s in row[4]:
+                    if s not in [x for x in "[,u,],'"]:
+                        _anot.append(s)
+
+                _seq_id = row[-1]
+
+                for sequence in _seq_id.split(","):
+                    if _seq_id not in nog_annots:
+                        nog_annots[sequence] = []
+                    nog_annots[sequence].extend(_anot)
 
         logging.info(">>> ✅ Annotation file loaded.")
         return nog_annots
 
     def _generate_ngram_dict(self) -> dict:
-        logging.info(">>> Loading in annotation file.")
+        logging.info(">>> Generating ngram dictonary file.")
 
         d = {}
 
@@ -105,34 +118,76 @@ class DataPrepper:
             }
 
             d.update(_i_d)
+
+        logging.info(">>> ✅ ngram dictionary created.")
+
         return d
 
     def load_fasta(self, fp) -> list:
         return SeqIO.parse(fp, "fasta")
 
-    def process(self) -> None:
-        def _process_data(fp: str) -> list:
+    def _process_data(self, fp: str) -> None:
 
-            for seq in SeqIO.parse(fp, "fasta"):
+        fp, out_dir = fp
+
+        output = {}
+
+        for index, seq in enumerate(SeqIO.parse(fp, "fasta")):
+            id = seq.id
+            try:
+                annotations = self.nog_annots[id]
+                process = True
+
+            except KeyError:
+                process = False
+
+            if process:
+                sequence_str = str(seq.seq)
+
                 ngrams = [
-                    self.ngram_dict[x] for x in textwrap.wrap(str(seq.seq), self.ngrams)
+                    self.ngram_dict[x] for x in textwrap.wrap(sequence_str, self.ngrams)
                 ]
-                print(ngrams)
-            return [0]
+
+                p_table = [self.ambig_dict[x] for x in sequence_str]
+
+                output[id] = {
+                    "COG": annotations,
+                    "ngrammed_sequence": ngrams,
+                    # "probability_table": p_table,
+                }
+
+        bfn = os.path.basename(fp)
+        woe = os.path.splitext(bfn)[0] + ".json"
+
+        sequences_out_dir = os.path.join(out_dir, "sequences")
+
+        if not os.path.isdir(sequences_out_dir):
+            os.mkdir(sequences_out_dir)
+
+        with open(os.path.join(sequences_out_dir, woe), "w") as outfile:
+            json.dump(output, outfile, indent=4)
+
+        return None
+
+    def process(self, out_dir: str) -> None:
 
         logging.info(">>> Processing data.")
 
         fps = [
-            os.path.join(self.eggnog_proteins_dir, x)
+            [os.path.join(self.eggnog_proteins_dir, x), out_dir]
             for x in os.listdir(self.eggnog_proteins_dir)
         ]
 
-        data = Parallel(n_jobs=16)(delayed(_process_data)(fp) for fp in fps)
+        #p = Pool(None)
+        #p.map(self._process_data, fps[0])
+
+        self._process_data(fps[0])
 
         self.is_processed = True
 
-    def export(self) -> None:
+    def export(self, out_dir) -> None:
         if self.is_processed:
-            pass
+            with open(os.path.join(out_dir, "ngram_dict.json"), "w") as outfile:
+                json.dump(self.ngram_dict, outfile, indent=4)
         else:
             print("Please apply run process on this class before exporting")

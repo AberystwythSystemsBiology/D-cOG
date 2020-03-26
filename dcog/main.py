@@ -5,23 +5,23 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 # Load the data and export it to a means suited for DL.
-eggnog_proteins_dir = "/home/keo7/Data/dcog/sequences"
-nog_annotations_fp = "/home/keo7/Data/dcog/e5.og_annotations.tsv"
-sequence_aliases_fp = "/home/keo7/Data/dcog/e5.sequence_aliases_v_smol.tsv"
+eggnog_proteins_dir = "/home/keo7/Data/dcog/sequence"
+protein_id_conversion = "/home/keo7/Data/dcog/all_OG_annotations.tsv"
 
 ambig_dict = {
     "X": [x for x in "ACDEFGHIKLMNPQRSTVWY"],
     "B": ["D", "N"],
     "Z": ["E", "Q"],
     "J": ["I", "L"],
+    "*": [x for x in "ACDEFGHIKLMNPQRSTVWY"]
 }
 
-dp = DataPrepper(
-    eggnog_proteins_dir,
-    nog_annotations_fp,
-    sequence_aliases_fp,
-    1,
-    ambig_dict=ambig_dict,
-)
 
-dp.process()
+out_dir = "/home/keo7/Data/dcog/test_output/"
+
+'''
+dp = DataPrepper(eggnog_proteins_dir, protein_id_conversion, 3, ambig_dict=ambig_dict,)
+dp.process(out_dir)
+dp.export(out_dir)
+'''
+
