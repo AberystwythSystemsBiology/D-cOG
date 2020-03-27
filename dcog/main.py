@@ -16,6 +16,12 @@ ambig_dict = {
     "*": [x for x in "ACDEFGHIKLMNPQRSTVWY"]
 }
 
+out_dir = "/home/keo7/Data/dcog/test_output/"
+
+dp = DataPrepper(eggnog_proteins_dir, protein_id_conversion, ngrams=3, ambig_dict=ambig_dict)
+dp.process(out_dir)
+dp.export(out_dir)
+
 nogs = {
     "D": "Cell cycle control, cell division, chromosome partitioning",
     "M": "Cell wall/membrane/envelope biogenesis",
@@ -46,7 +52,6 @@ nogs = {
 
 encoded_labels = {a: i for i, a in enumerate(nogs.keys())}
 
-out_dir = "/home/keo7/Data/dcog/test_output/"
 sequences_dir = os.path.join(out_dir, "sequences")
 ngram_dict_fp = os.path.join(out_dir, "ngram_dict.json")
 
@@ -57,11 +62,13 @@ max_features = max(ngrams.items())[1] + 1
 
 filepaths = [os.path.join(sequences_dir, x) for x in os.listdir(sequences_dir)]
 
-dg = DataGenerator(filepaths, encoded_labels, 100)
+dg = DataGenerator(filepaths, encoded_labels, 100, batch_size=1024)
 
-from keras.models import Sequential
-from keras.layers import Dense, Embedding
-from keras.layers import LSTM
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Embedding
+from tensorflow.keras.layers import LSTM
+
+print(max_features)
 
 model = Sequential()
 model.add(Embedding(max_features, 128))
@@ -73,4 +80,8 @@ model.compile(loss='sparse_categorical_crossentropy',
               optimizer='adam',
               metrics=['accuracy'])
 
-model.fit_generator(dg)
+#model.fit_generator(dg)
+
+
+for X, y in dg:
+   model.fit(X, y, batch_size=64, epochs=10)
