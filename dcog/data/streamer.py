@@ -43,8 +43,12 @@ class DataGenerator(Sequence):
         return seq, con
 
     def __data_generation(self, file_paths_temp):
+        '''
         p = Pool(None)
         d = p.map(self._process_data, file_paths_temp)
+        '''
+
+        d = [self._process_data(x) for x in file_paths_temp]
         X, y = [x[0] for x in d], [x[1] for x in d]
 
         X = pad_sequences(np.array(X), self.max_length)

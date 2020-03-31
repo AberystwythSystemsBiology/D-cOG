@@ -7,6 +7,7 @@ import os
 import sys
 import json
 
+# Temporary fix for field_size_limit.
 csv.field_size_limit(sys.maxsize)
 
 from multiprocessing import Pool

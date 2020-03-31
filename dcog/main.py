@@ -1,6 +1,9 @@
 import os, json
 from data import DataPrepper, DataGenerator
+from deeplearning import Model
 import logging
+from sklearn.model_selection import KFold, train_test_split
+import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 
@@ -8,19 +11,6 @@ logging.basicConfig(level=logging.INFO)
 eggnog_proteins_dir = "/home/keo7/Data/dcog/sequence"
 protein_id_conversion = "/home/keo7/Data/dcog/all_OG_annotations.tsv"
 
-ambig_dict = {
-    "X": [x for x in "ACDEFGHIKLMNPQRSTVWY"],
-    "B": ["D", "N"],
-    "Z": ["E", "Q"],
-    "J": ["I", "L"],
-    "*": [x for x in "ACDEFGHIKLMNPQRSTVWY"]
-}
-
-out_dir = "/home/keo7/Data/dcog/test_output/"
-
-dp = DataPrepper(eggnog_proteins_dir, protein_id_conversion, ngrams=3, ambig_dict=ambig_dict)
-dp.process(out_dir)
-dp.export(out_dir)
 
 nogs = {
     "D": "Cell cycle control, cell division, chromosome partitioning",
@@ -50,38 +40,40 @@ nogs = {
     "S": "Function unknown"
 }
 
-encoded_labels = {a: i for i, a in enumerate(nogs.keys())}
 
+ambig_dict = {
+    "X": [x for x in "ACDEFGHIKLMNPQRSTVWY"],
+    "B": ["D", "N"],
+    "Z": ["E", "Q"],
+    "J": ["I", "L"],
+    "*": [x for x in "ACDEFGHIKLMNPQRSTVWY"]
+}
+
+out_dir = "/home/keo7/Data/dcog/test_output/"
 sequences_dir = os.path.join(out_dir, "sequences")
 ngram_dict_fp = os.path.join(out_dir, "ngram_dict.json")
 
+
+encoded_labels = {a: i for i, a in enumerate(nogs.keys())}
+
 with open(ngram_dict_fp, "r") as infile:
-    ngrams = json.load(infile)
+    ngrams_dict = json.load(infile)
 
-max_features = max(ngrams.items())[1] + 1
+filepaths = np.array([os.path.join(sequences_dir, x) for x in os.listdir(sequences_dir)])[0:500]
 
-filepaths = [os.path.join(sequences_dir, x) for x in os.listdir(sequences_dir)]
+kf = KFold(n_splits=10)
+for k, (train_index, test_index) in enumerate(kf.split(filepaths)):
 
-dg = DataGenerator(filepaths, encoded_labels, 100, batch_size=1024)
+    training_fps = filepaths[train_index]
+    training_fps, val_fps = train_test_split(training_fps, test_size=0.2)
+    test_fps = filepaths[test_index]
 
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Embedding
-from tensorflow.keras.layers import LSTM
+    train_dg = DataGenerator(training_fps, encoded_labels, 100, batch_size=32)
+    val_dg = DataGenerator(training_fps, encoded_labels, 100, batch_size=32)
+    test_dg = DataGenerator(test_fps, encoded_labels, 100, batch_size=32)
 
-print(max_features)
+    output_dir = "/tmp/dcog/k_fold_%i/" % (k)
 
-model = Sequential()
-model.add(Embedding(max_features, 128))
-model.add(LSTM(128, dropout=0.2, recurrent_dropout=0.2))
-model.add(Dense(len(nogs.keys()), activation='softmax'))
-
-# try using different optimizers and different optimizer configs
-model.compile(loss='sparse_categorical_crossentropy',
-              optimizer='adam',
-              metrics=['accuracy'])
-
-#model.fit_generator(dg)
-
-
-for X, y in dg:
-   model.fit(X, y, batch_size=64, epochs=10)
+    clf = Model(ngrams_dict, nogs, output_dir)
+    #clf.train(train_dg, val_dg)
+    clf.evaluate(test_dg, encoded_labels)
