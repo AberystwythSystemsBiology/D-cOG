@@ -58,7 +58,7 @@ class Model:
         return clf
 
     
-    def train(self, train_generator, validation_data = None, epochs: int=5, validation_split: float=0.2, shuffle:bool = False):
+    def train(self, train_generator, validation_data = None, epochs: int=5):
 
 
         mc = ModelCheckpoint(self.checkpoint_fp, save_best_only=True)
@@ -66,7 +66,7 @@ class Model:
         cl = CSVLogger(self.log_fp)
 
 
-        self.clf.fit(train_generator, validation_data=validation_data, epochs=epochs, shuffle=shuffle, callbacks=[mc, es, cl])
+        self.clf.fit(train_generator, validation_data=validation_data, epochs=epochs, callbacks=[mc, es, cl])
 
         # Load best model.
         self.clf = load_model(self.checkpoint_fp)

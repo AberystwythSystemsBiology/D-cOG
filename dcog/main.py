@@ -4,6 +4,7 @@ from deeplearning import Model
 import logging
 from sklearn.model_selection import KFold, train_test_split
 import numpy as np
+import random
 
 logging.basicConfig(level=logging.INFO)
 
@@ -59,7 +60,8 @@ encoded_labels = {a: i for i, a in enumerate(nogs.keys())}
 with open(ngram_dict_fp, "r") as infile:
     ngrams_dict = json.load(infile)
 
-filepaths = np.array([os.path.join(sequences_dir, x) for x in os.listdir(sequences_dir)])[0:500]
+filepaths = np.array([os.path.join(sequences_dir, x) for x in os.listdir(sequences_dir)])
+random.shuffle(filepaths)
 
 kf = KFold(n_splits=10)
 for k, (train_index, test_index) in enumerate(kf.split(filepaths)):
@@ -68,12 +70,12 @@ for k, (train_index, test_index) in enumerate(kf.split(filepaths)):
     training_fps, val_fps = train_test_split(training_fps, test_size=0.2)
     test_fps = filepaths[test_index]
 
-    train_dg = DataGenerator(training_fps, encoded_labels, 100, batch_size=32)
-    val_dg = DataGenerator(training_fps, encoded_labels, 100, batch_size=32)
-    test_dg = DataGenerator(test_fps, encoded_labels, 100, batch_size=32)
+    train_dg = DataGenerator(training_fps, encoded_labels, 130, batch_size=32, mp=False)
+    val_dg = DataGenerator(training_fps, encoded_labels, 130, batch_size=32, mp=False)
+    test_dg = DataGenerator(test_fps, encoded_labels, 130, batch_size=32, mp=False)
 
     output_dir = "/tmp/dcog/k_fold_%i/" % (k)
 
     clf = Model(ngrams_dict, nogs, output_dir)
-    #clf.train(train_dg, val_dg)
+    clf.train(train_dg, val_dg, epochs=500)
     clf.evaluate(test_dg, encoded_labels)
