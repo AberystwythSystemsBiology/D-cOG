@@ -9,6 +9,7 @@ class DataGenerator(Sequence):
 
     def __init__(self, filepaths: str, encoded_labels: dict, max_length: int, batch_size: int=32, shuffle: bool=True, mp: bool=True):
         self.filepaths = np.array(filepaths)
+        print(self.filepaths)
         self.encoded_labels = encoded_labels
         self.max_length = max_length
         self.batch_size = batch_size
@@ -22,11 +23,13 @@ class DataGenerator(Sequence):
         return int(np.floor(len(self.filepaths) / self.batch_size))
 
     def on_epoch_end(self):
+
         self.indexes = np.arange(len(self.filepaths))
         if self.shuffle is True:
             np.random.shuffle(self.indexes)
 
     def __getitem__(self, index):
+
         indexes = self.indexes[index * self.batch_size:self.batch_size * (index + 1)]
 
         file_paths_temp = [self.filepaths[k] for k in indexes]
@@ -37,6 +40,7 @@ class DataGenerator(Sequence):
 
 
     def _process_data(self, filepath):
+
         with open(filepath, "r") as infile:
             data = json.load(infile)
             seq = np.array(data["ngrammed_sequence"])
